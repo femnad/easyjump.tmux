@@ -37,9 +37,9 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
         "--text-attrs", common_options.text_attrs,
     ]
     if copy_line:
-        shell_args.extend(['--copy_line', 'on'])
+        shell_args.extend(['--copy-line', 'on'])
     elif copy_word:
-        shell_args.extend(['--copy_word', 'on'])
+        shell_args.extend(['--copy-word', 'on'])
 
     args = [
         "tmux",
