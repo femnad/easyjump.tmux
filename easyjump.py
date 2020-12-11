@@ -28,6 +28,7 @@ def parse_args():
     arg_parser.add_argument("--key")
     arg_parser.add_argument("--cursor-pos")
     arg_parser.add_argument("--regions")
+    arg_parser.add_argument("--copy-line", action='store_true')
 
     class Args(argparse.Namespace):
         def __init__(self):
@@ -43,7 +44,7 @@ def parse_args():
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -65,6 +66,7 @@ def parse_args():
     REGIONS = tuple(
         map(lambda x: int(x), [] if args.regions == "" else args.regions.split(","))
     )
+    COPY_LINE = args.copy_line
 
 
 parse_args()
@@ -176,7 +178,12 @@ class Screen:
             subprocess.run(
                 args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
-            self._send_keys(reverse_column_number, 'begin-selection')
+            if COPY_LINE:
+                self._send_keys(reverse_column_number, 'begin-selection')
+                self._send_keys(reverse_column_number, 'end-of-line')
+                self._send_keys(reverse_column_number, 'cursor-left')
+                self._send_keys(reverse_column_number, 'copy-selection-and-cancel')
+
         else:
             # cursor at start of line
             if position.char_number >= 2:
@@ -196,7 +203,12 @@ class Screen:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                self._send_keys(position.char_number - 1, 'begin-selection')
+                if COPY_LINE:
+                    self._send_keys(position.char_number - 1, 'begin-selection')
+                    self._send_keys(position.char_number - 1, 'end-of-line')
+                    self._send_keys(position.char_number - 1, 'cursor-left')
+                    self._send_keys(position.char_number - 1, 'copy-selection-and-cancel')
+
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
