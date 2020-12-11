@@ -93,6 +93,24 @@ class Screen:
         if not self._alternate_allowed:
             self._snapshot = self._get_snapshot()
 
+    def _send_keys(self, repeat_count: int, command: str):
+        args = [
+            "tmux",
+            "send-keys",
+            "-t",
+            self._id,
+            "-X",
+            "-N",
+            str(repeat_count - 1),
+            command,
+        ]
+        subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
     @contextmanager
     def label_positions(
         self, positions: typing.List["Position"], labels: typing.List[str]
@@ -158,6 +176,7 @@ class Screen:
             subprocess.run(
                 args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
+            self._send_keys(reverse_column_number, 'begin-selection')
         else:
             # cursor at start of line
             if position.char_number >= 2:
@@ -177,6 +196,7 @@ class Screen:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                self._send_keys(position.char_number - 1, 'begin-selection')
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
