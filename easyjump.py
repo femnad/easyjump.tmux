@@ -28,6 +28,10 @@ def parse_args():
     arg_parser.add_argument("--key")
     arg_parser.add_argument("--cursor-pos")
     arg_parser.add_argument("--regions")
+    arg_parser.add_argument("--copy-line")
+    arg_parser.add_argument("--copy-word")
+    arg_parser.add_argument("--paste-after")
+    arg_parser.add_argument("--begin-selection")
 
     class Args(argparse.Namespace):
         def __init__(self):
@@ -40,10 +44,14 @@ def parse_args():
             self.key = ""
             self.cursor_pos = ""
             self.regions = ""
+            self.copy_line = ""
+            self.copy_word = ""
+            self.paste_after = ""
+            self.begin_selection = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD, PASTE_AFTER, BEGIN_SELECTION
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -65,6 +73,10 @@ def parse_args():
     REGIONS = tuple(
         map(lambda x: int(x), [] if args.regions == "" else args.regions.split(","))
     )
+    COPY_LINE = args.copy_line == 'on'
+    COPY_WORD = args.copy_word == 'on'
+    PASTE_AFTER = args.paste_after == 'on'
+    BEGIN_SELECTION = args.begin_selection == 'on'
 
 
 parse_args()
@@ -92,6 +104,37 @@ class Screen:
         self._lines = self._get_lines()
         if not self._alternate_allowed:
             self._snapshot = self._get_snapshot()
+
+    def _run_tmux_command(self, command, *args, target_pane=None):
+        base_args = ['tmux', command]
+        target = ['-t', target_pane] if target_pane is not None else ['-t', self._id]
+        args = base_args + target + list(args)
+
+        subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    def _paste_buffer(self):
+        self._run_tmux_command('paste-buffer')
+
+    def _send_keys(self, command: str):
+        args = [
+            "tmux",
+            "send-keys",
+            "-t",
+            self._id,
+            "-X",
+            command,
+        ]
+        subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     @contextmanager
     def label_positions(
@@ -177,6 +220,20 @@ class Screen:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+        if COPY_LINE:
+            self._send_keys('begin-selection')
+            self._send_keys('end-of-line')
+            self._send_keys('cursor-left')
+            self._send_keys('copy-selection-and-cancel')
+        elif COPY_WORD:
+            self._send_keys('begin-selection')
+            self._send_keys('next-word-end')
+            self._send_keys('copy-selection-and-cancel')
+        elif BEGIN_SELECTION:
+            self._send_keys('begin-selection')
+
+        if PASTE_AFTER:
+            self._paste_buffer()
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))

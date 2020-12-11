@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
+from collections import namedtuple
 import datetime
 import os
 import shlex
 import subprocess
 import sys
 import tempfile
+from typing import List
+
+
+CommonOptions = namedtuple('Options', ['smart_case', 'label_chars', 'label_attrs', 'text_attrs', 'log'])
 
 
 def get_option(option_name: str) -> str:
@@ -14,40 +19,56 @@ def get_option(option_name: str) -> str:
     return option_value
 
 
-def main():
-    key_binding = get_option("@easyjump-key-binding") or "j"
-    smart_case = get_option("@easyjump-smart-case")
-    label_chars = get_option("@easyjump-label-chars")
-    label_attrs = get_option("@easyjump-label-attrs")
-    text_attrs = get_option("@easyjump-text-attrs")
+def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False,
+        copy_mode_bindings: bool = True, paste_after: bool = False, begin_selection: bool = False):
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
-    time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-    log_file_name = os.path.join(
-        tempfile.gettempdir(), "easyjump_{}.log".format(time_str)
-    )
+
+    shell_args = [
+        sys.executable,
+        script_file_name,
+        "--mode", "xcopy",
+        "--smart-case", common_options.smart_case,
+        "--label-chars", common_options.label_chars,
+        "--label-attrs", common_options.label_attrs,
+        "--text-attrs", common_options.text_attrs,
+    ]
+    if copy_line:
+        shell_args.extend(['--copy-line', 'on'])
+    elif copy_word:
+        shell_args.extend(['--copy-word', 'on'])
+
+    if paste_after:
+        shell_args.extend(['--paste-after', 'on'])
+
+    if begin_selection:
+        shell_args.extend(['--begin-selection', 'on'])
+
+    shell_command = shlex.join(shell_args)
+    if common_options.log:
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+        log_file_name = os.path.join(
+            tempfile.gettempdir(), "easyjump_{}.log".format(time_str)
+        )
+        shell_command += f' >>{shlex.quote(log_file_name)} 2>&1 || true'
+    else:
+        shell_command += ' || true'
+
     args = [
         "tmux",
         "bind-key",
         key_binding,
         "run-shell",
         "-b",
-        shlex.join(
-            [
-                sys.executable,
-                script_file_name,
-                "--mode", "xcopy",
-                "--smart-case", smart_case,
-                "--label-chars", label_chars,
-                "--label-attrs", label_attrs,
-                "--text-attrs", text_attrs,
-            ]
-        )
-        + " >>{} 2>&1 || true".format(shlex.quote(log_file_name)),
+        shell_command,
     ]
     subprocess.run(
         args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+
+    if not copy_mode_bindings:
+        return
+
     args2 = args[:]
     args2[2:3] = ['-T', 'copy-mode', 'C-' + key_binding]
     subprocess.run(
@@ -58,6 +79,41 @@ def main():
     subprocess.run(
         args3, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+
+
+def toggle_case(key: str) -> str:
+    if key.isupper():
+        return key.lower()
+    return key.upper()
+
+
+def bind_auxiliary_function(common_options: CommonOptions, option_key: str, copy_line: bool, copy_word: bool):
+    key_binding = get_option(option_key)
+    if key_binding == '':
+        return
+
+    bind_keys(common_options, key_binding, copy_line, copy_word, copy_mode_bindings=False, paste_after=True)
+    bind_keys(common_options, toggle_case(key_binding), copy_line, copy_word, copy_mode_bindings=False, paste_after=False)
+
+
+def main():
+    key_binding = get_option("@easyjump-key-binding") or "j"
+
+    smart_case = get_option("@easyjump-smart-case")
+    label_chars = get_option("@easyjump-label-chars")
+    label_attrs = get_option("@easyjump-label-attrs")
+    text_attrs = get_option("@easyjump-text-attrs")
+
+    log_setting = get_option("@easyjump-log")
+    log = log_setting == 'on'
+
+    common_options = CommonOptions(smart_case, label_chars, label_attrs, text_attrs, log)
+
+    bind_keys(common_options, key_binding, begin_selection=True)
+    bind_keys(common_options, toggle_case(key_binding))
+
+    bind_auxiliary_function(common_options, '@easyjump-copy-line-binding', copy_line=True, copy_word=False)
+    bind_auxiliary_function(common_options, '@easyjump-copy-word-binding', copy_line=False, copy_word=True)
 
 
 main()
