@@ -20,7 +20,7 @@ def main():
     label_chars = get_option("@easyjump-label-chars")
     label_attrs = get_option("@easyjump-label-attrs")
     text_attrs = get_option("@easyjump-text-attrs")
-    copy_line = get_option("@easyjump-copy-line") == 'on'
+    copy_line = get_option("@easyjump-copy-line")
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
     time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")

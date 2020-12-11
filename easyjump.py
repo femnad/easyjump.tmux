@@ -28,7 +28,7 @@ def parse_args():
     arg_parser.add_argument("--key")
     arg_parser.add_argument("--cursor-pos")
     arg_parser.add_argument("--regions")
-    arg_parser.add_argument("--copy-line", action='store_true')
+    arg_parser.add_argument("--copy-line")
 
     class Args(argparse.Namespace):
         def __init__(self):
@@ -41,6 +41,7 @@ def parse_args():
             self.key = ""
             self.cursor_pos = ""
             self.regions = ""
+            self.copy_region = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
@@ -66,7 +67,7 @@ def parse_args():
     REGIONS = tuple(
         map(lambda x: int(x), [] if args.regions == "" else args.regions.split(","))
     )
-    COPY_LINE = args.copy_line
+    COPY_LINE = args.copy_line == 'on'
 
 
 parse_args()
