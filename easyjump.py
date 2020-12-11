@@ -29,6 +29,7 @@ def parse_args():
     arg_parser.add_argument("--cursor-pos")
     arg_parser.add_argument("--regions")
     arg_parser.add_argument("--copy-line")
+    arg_parser.add_argument("--copy-word")
 
     class Args(argparse.Namespace):
         def __init__(self):
@@ -41,11 +42,12 @@ def parse_args():
             self.key = ""
             self.cursor_pos = ""
             self.regions = ""
-            self.copy_region = ""
+            self.copy_line = ""
+            self.copy_word = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -68,6 +70,7 @@ def parse_args():
         map(lambda x: int(x), [] if args.regions == "" else args.regions.split(","))
     )
     COPY_LINE = args.copy_line == 'on'
+    COPY_WORD = args.copy_word == 'on'
 
 
 parse_args()
@@ -184,6 +187,10 @@ class Screen:
                 self._send_keys(reverse_column_number, 'end-of-line')
                 self._send_keys(reverse_column_number, 'cursor-left')
                 self._send_keys(reverse_column_number, 'copy-selection-and-cancel')
+            elif COPY_WORD:
+                self._send_keys(reverse_column_number, 'begin-selection')
+                self._send_keys(reverse_column_number, 'next-word')
+                self._send_keys(reverse_column_number, 'copy-selection-and-cancel')
 
         else:
             # cursor at start of line
@@ -209,6 +216,11 @@ class Screen:
                     self._send_keys(position.char_number - 1, 'end-of-line')
                     self._send_keys(position.char_number - 1, 'cursor-left')
                     self._send_keys(position.char_number - 1, 'copy-selection-and-cancel')
+                elif COPY_WORD:
+                    self._send_keys(position.char_number - 1, 'begin-selection')
+                    self._send_keys(position.char_number - 1, 'next-word')
+                    self._send_keys(position.char_number - 1, 'copy-selection-and-cancel')
+
 
 
     def _mouse_jump_to_position(self, position: "Position"):
