@@ -99,15 +99,13 @@ class Screen:
         if not self._alternate_allowed:
             self._snapshot = self._get_snapshot()
 
-    def _send_keys(self, repeat_count: int, command: str):
+    def _send_keys(self, command: str):
         args = [
             "tmux",
             "send-keys",
             "-t",
             self._id,
             "-X",
-            "-N",
-            str(repeat_count - 1),
             command,
         ]
         subprocess.run(
@@ -182,16 +180,6 @@ class Screen:
             subprocess.run(
                 args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
-            if COPY_LINE:
-                self._send_keys(reverse_column_number, 'begin-selection')
-                self._send_keys(reverse_column_number, 'end-of-line')
-                self._send_keys(reverse_column_number, 'cursor-left')
-                self._send_keys(reverse_column_number, 'copy-selection-and-cancel')
-            elif COPY_WORD:
-                self._send_keys(reverse_column_number, 'begin-selection')
-                self._send_keys(reverse_column_number, 'next-word')
-                self._send_keys(reverse_column_number, 'copy-selection-and-cancel')
-
         else:
             # cursor at start of line
             if position.char_number >= 2:
@@ -211,17 +199,15 @@ class Screen:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                if COPY_LINE:
-                    self._send_keys(position.char_number - 1, 'begin-selection')
-                    self._send_keys(position.char_number - 1, 'end-of-line')
-                    self._send_keys(position.char_number - 1, 'cursor-left')
-                    self._send_keys(position.char_number - 1, 'copy-selection-and-cancel')
-                elif COPY_WORD:
-                    self._send_keys(position.char_number - 1, 'begin-selection')
-                    self._send_keys(position.char_number - 1, 'next-word')
-                    self._send_keys(position.char_number - 1, 'copy-selection-and-cancel')
-
-
+        if COPY_LINE:
+            self._send_keys('begin-selection')
+            self._send_keys('end-of-line')
+            self._send_keys('cursor-left')
+            self._send_keys('copy-selection-and-cancel')
+        elif COPY_WORD:
+            self._send_keys('begin-selection')
+            self._send_keys('next-word-end')
+            self._send_keys('copy-selection-and-cancel')
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
