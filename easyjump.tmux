@@ -19,7 +19,8 @@ def get_option(option_name: str) -> str:
     return option_value
 
 
-def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False):
+def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False,
+        copy_mode_bindings: bool = True):
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
     time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
@@ -52,6 +53,10 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
     subprocess.run(
         args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+
+    if not copy_mode_bindings:
+        return
+
     args2 = args[:]
     args2[2:3] = ['-T', 'copy-mode', 'C-' + key_binding]
     subprocess.run(
@@ -77,8 +82,8 @@ def main():
     common_options = CommonOptions(smart_case, label_chars, label_attrs, text_attrs)
 
     bind_keys(common_options, key_binding)
-    bind_keys(common_options, copy_line_key_binding, copy_line=True)
-    bind_keys(common_options, copy_word_key_binding, copy_word=True)
+    bind_keys(common_options, copy_line_key_binding, copy_line=True, copy_mode_bindings=False)
+    bind_keys(common_options, copy_word_key_binding, copy_word=True, copy_mode_bindings=False)
 
 
 main()
