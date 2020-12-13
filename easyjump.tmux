@@ -5,7 +5,6 @@ import os
 import shlex
 import subprocess
 import sys
-import tempfile
 from typing import List
 
 
@@ -24,9 +23,6 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
     time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
-    log_file_name = os.path.join(
-        tempfile.gettempdir(), "easyjump_{}.log".format(time_str)
-    )
 
     shell_args = [
         sys.executable,
@@ -51,7 +47,7 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
         key_binding,
         "run-shell",
         "-b",
-        shlex.join(shell_args) + " >>{} 2>&1 || true".format(shlex.quote(log_file_name)),
+        shlex.join(shell_args),
     ]
     subprocess.run(
         args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
