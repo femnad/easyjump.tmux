@@ -102,15 +102,19 @@ class Screen:
         if not self._alternate_allowed:
             self._snapshot = self._get_snapshot()
 
-    def _send_keys(self, command: str):
+    def _send_keys(self, command: str, into_copy_mode: bool = True):
         args = [
             "tmux",
             "send-keys",
             "-t",
             self._id,
-            "-X",
-            command,
         ]
+
+        if into_copy_mode:
+            args.append("-X")
+
+        args.append(command)
+
         subprocess.run(
             args,
             check=True,
@@ -213,7 +217,7 @@ class Screen:
             self._send_keys('copy-selection-and-cancel')
 
         if PASTE_AFTER:
-            self._send_keys('paste-buffer')
+            self._send_keys('paste-buffer', into_copy_mode=False)
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
