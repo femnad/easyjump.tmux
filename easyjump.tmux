@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 from typing import List
 
 
@@ -19,10 +20,9 @@ def get_option(option_name: str) -> str:
 
 
 def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False,
-        copy_mode_bindings: bool = True, paste_after: bool = False):
+        copy_mode_bindings: bool = True, paste_after: bool = False, log=False):
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
-    time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
 
     shell_args = [
         sys.executable,
@@ -41,13 +41,23 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
     if paste_after:
         shell_args.extend(['--paste-after', 'on'])
 
+    shell_command = shlex.join(shell_args)
+    if log:
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
+        log_file_name = os.path.join(
+            tempfile.gettempdir(), "easyjump_{}.log".format(time_str)
+        )
+        shell_command += f' >>{shlex.quote(log_file_name)} 2>&1 || true'
+    else:
+        shell_command += f'{shell_command} || true'
+
     args = [
         "tmux",
         "bind-key",
         key_binding,
         "run-shell",
         "-b",
-        shlex.join(shell_args),
+        shell_command,
     ]
     subprocess.run(
         args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
