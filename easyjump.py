@@ -213,7 +213,7 @@ class Screen:
             self._send_keys('copy-selection-and-cancel')
 
         if PASTE_AFTER:
-            self._send_keys('show-buffer')
+            self._send_keys('paste-buffer')
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
