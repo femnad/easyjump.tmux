@@ -20,7 +20,7 @@ def get_option(option_name: str) -> str:
 
 
 def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False,
-        copy_mode_bindings: bool = True):
+        copy_mode_bindings: bool = True, paste_after: bool = False):
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
     time_str = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
@@ -41,6 +41,9 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
         shell_args.extend(['--copy-line', 'on'])
     elif copy_word:
         shell_args.extend(['--copy-word', 'on'])
+
+    if paste_after:
+        shell_args.extend(['--paste-after', 'on'])
 
     args = [
         "tmux",
@@ -82,8 +85,8 @@ def main():
     common_options = CommonOptions(smart_case, label_chars, label_attrs, text_attrs)
 
     bind_keys(common_options, key_binding)
-    bind_keys(common_options, copy_line_key_binding, copy_line=True, copy_mode_bindings=False)
-    bind_keys(common_options, copy_word_key_binding, copy_word=True, copy_mode_bindings=False)
+    bind_keys(common_options, copy_line_key_binding, copy_line=True, copy_mode_bindings=False, paste_after=True)
+    bind_keys(common_options, copy_word_key_binding, copy_word=True, copy_mode_bindings=False, paste_after=True)
 
 
 main()

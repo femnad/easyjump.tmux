@@ -44,10 +44,11 @@ def parse_args():
             self.regions = ""
             self.copy_line = ""
             self.copy_word = ""
+            self.paste_after = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD, PASTE_AFTER
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -71,6 +72,7 @@ def parse_args():
     )
     COPY_LINE = args.copy_line == 'on'
     COPY_WORD = args.copy_word == 'on'
+    PASTE_AFTER = args.paste_after == 'on'
 
 
 parse_args()
@@ -208,6 +210,9 @@ class Screen:
             self._send_keys('begin-selection')
             self._send_keys('next-word-end')
             self._send_keys('copy-selection-and-cancel')
+
+        if PASTE_AFTER:
+            self._send_keys('show-buffer')
 
     def _mouse_jump_to_position(self, position: "Position"):
         x = bytes((0x20 + position.column_number,))
