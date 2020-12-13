@@ -30,6 +30,7 @@ def parse_args():
     arg_parser.add_argument("--regions")
     arg_parser.add_argument("--copy-line")
     arg_parser.add_argument("--copy-word")
+    arg_parser.add_argument("--paste-after")
 
     class Args(argparse.Namespace):
         def __init__(self):
