@@ -49,7 +49,7 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
         )
         shell_command += f' >>{shlex.quote(log_file_name)} 2>&1 || true'
     else:
-        shell_command += f'{shell_command} || true'
+        shell_command += ' || true'
 
     args = [
         "tmux",
