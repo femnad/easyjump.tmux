@@ -31,6 +31,7 @@ def parse_args():
     arg_parser.add_argument("--copy-line")
     arg_parser.add_argument("--copy-word")
     arg_parser.add_argument("--paste-after")
+    arg_parser.add_argument("--begin-selection")
 
     class Args(argparse.Namespace):
         def __init__(self):
@@ -46,10 +47,11 @@ def parse_args():
             self.copy_line = ""
             self.copy_word = ""
             self.paste_after = ""
+            self.begin_selection = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD, PASTE_AFTER
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, COPY_LINE, COPY_WORD, PASTE_AFTER,BEGIN_SELECTION
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -226,6 +228,8 @@ class Screen:
             self._send_keys('begin-selection')
             self._send_keys('next-word-end')
             self._send_keys('copy-selection-and-cancel')
+        elif BEGIN_SELECTION:
+            self._send_keys('begin-selection')
 
         if PASTE_AFTER:
             self._paste_buffer()

@@ -20,7 +20,7 @@ def get_option(option_name: str) -> str:
 
 
 def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool = False, copy_word: bool = False,
-        copy_mode_bindings: bool = True, paste_after: bool = False):
+        copy_mode_bindings: bool = True, paste_after: bool = False, begin_selection: bool = False):
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_file_name = os.path.join(dir_name, "easyjump.py")
 
@@ -40,6 +40,9 @@ def bind_keys(common_options: CommonOptions, key_binding: str, copy_line: bool =
 
     if paste_after:
         shell_args.extend(['--paste-after', 'on'])
+
+    if begin_selection:
+        shell_args.extend(['--begin-selection', 'on'])
 
     shell_command = shlex.join(shell_args)
     if common_options.log:
@@ -106,7 +109,8 @@ def main():
 
     common_options = CommonOptions(smart_case, label_chars, label_attrs, text_attrs, log)
 
-    bind_keys(common_options, key_binding)
+    bind_keys(common_options, key_binding, begin_selection=True)
+    bind_keys(common_options, toggle_case(key_binding))
 
     bind_auxiliary_function(common_options, '@easyjump-copy-line-binding', copy_line=True, copy_word=False)
     bind_auxiliary_function(common_options, '@easyjump-copy-word-binding', copy_line=False, copy_word=True)
