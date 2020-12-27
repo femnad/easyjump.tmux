@@ -76,6 +76,7 @@ def parse_args():
     COPY_LINE = args.copy_line == 'on'
     COPY_WORD = args.copy_word == 'on'
     PASTE_AFTER = args.paste_after == 'on'
+    BEGIN_SELECTION = args.begin_selection == 'on'
 
 
 parse_args()
