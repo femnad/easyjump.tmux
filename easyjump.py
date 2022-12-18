@@ -30,8 +30,13 @@ def parse_args() -> None:
     arg_parser.add_argument("--cursor-pos")
     arg_parser.add_argument("--regions")
     arg_parser.add_argument("--auto-begin-selection")
+    arg_parser.add_argument("--copy-line")
+    arg_parser.add_argument("--copy-word")
+    arg_parser.add_argument("--copy-until-space")
+    arg_parser.add_argument("--paste-after")
 
     class Args(argparse.Namespace):
+
         def __init__(self) -> None:
             self.mode = ""
             self.smart_case = ""
@@ -43,10 +48,15 @@ def parse_args() -> None:
             self.cursor_pos = ""
             self.regions = ""
             self.auto_begin_selection = ""
+            self.copy_word = ""
+            self.copy_until_space = ""
+            self.copy_line = ""
+            self.paste_after = ""
+            self.copy_mody_bindings = ""
 
     args = arg_parser.parse_args(sys.argv[1:], namespace=Args())
 
-    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, AUTO_BEGIN_SELECTION
+    global MODE, SMART_CASE, LABEL_CHARS, LABEL_ATTRS, TEXT_ATTRS, TEXT_ATTRS, PRINT_COMMAND_ONLY, KEY, CURSOR_POS, REGIONS, AUTO_BEGIN_SELECTION, COPY_WORD, COPY_UNTIL_SPACE, COPY_LINE, PASTE_AFTER
     MODE = {
         "mouse": Mode.MOUSE,
         "xcopy": Mode.XCOPY,
@@ -55,20 +65,18 @@ def parse_args() -> None:
     LABEL_CHARS = args.label_chars or "fjdkslaghrueiwoqptyvncmxzb1234567890"
     LABEL_ATTRS = args.label_attrs or "\033[1m\033[38;5;172m"
     TEXT_ATTRS = args.text_attrs or "\033[0m\033[38;5;237m"
-    PRINT_COMMAND_ONLY = (
-        args.print_command_only.lower() or "on"
-    ) == "on"  # mouse mode only
+    PRINT_COMMAND_ONLY = (args.print_command_only.lower() or "on") == "on"  # mouse mode only
     KEY = args.key
-    CURSOR_POS = tuple(
-        map(
-            lambda x: int(x),
-            [] if args.cursor_pos == "" else args.cursor_pos.split(",", 1),
-        )
-    )
-    REGIONS = tuple(
-        map(lambda x: int(x), [] if args.regions == "" else args.regions.split(","))
-    )
+    CURSOR_POS = tuple(map(
+        lambda x: int(x),
+        [] if args.cursor_pos == "" else args.cursor_pos.split(",", 1),
+    ))
+    REGIONS = tuple(map(lambda x: int(x), [] if args.regions == "" else args.regions.split(",")))
     AUTO_BEGIN_SELECTION = (args.auto_begin_selection.lower() or "on") == "on"
+    COPY_WORD = (args.copy_word.lower()) == "on"
+    COPY_UNTIL_SPACE = args.copy_until_space.lower() == "on"
+    COPY_LINE = (args.copy_line.lower()) == "on"
+    PASTE_AFTER = (args.paste_after.lower()) == "on"
 
 
 parse_args()
@@ -179,8 +187,8 @@ class Screen:
                 selection_end_y = int(tmux_vars["selection_end_y"])
                 selection_end_y -= self._history_size - scroll_position  # tmux bug?
                 if (selection_start_x, selection_start_y) == (
-                    copy_cursor_x,
-                    copy_cursor_y,
+                        copy_cursor_x,
+                        copy_cursor_y,
                 ):  # tmux bug?
                     selection_start_x, selection_start_y = (
                         selection_end_x,
@@ -196,9 +204,7 @@ class Screen:
                 )
             else:
                 selection = None
-            self._copy_mode = _CopyMode(
-                scroll_position, copy_cursor_x, copy_cursor_y, selection
-            )
+            self._copy_mode = _CopyMode(scroll_position, copy_cursor_x, copy_cursor_y, selection)
             self._cursor_pos.append((copy_cursor_x, copy_cursor_y))
         else:
             self._copy_mode = None
@@ -229,15 +235,12 @@ class Screen:
         return lines
 
     def _get_snapshot(self) -> str:
-        snapshot = _run_tmux_command(
-            "capture-pane", "-t", self._id, "-e", "-p"
-        ).replace("\n", "\r\n")
+        snapshot = _run_tmux_command("capture-pane", "-t", self._id, "-e", "-p").replace("\n", "\r\n")
         return snapshot
 
     @contextmanager
-    def label_positions(
-        self, positions: typing.List["Position"], labels: typing.List[str]
-    ) -> typing.Generator[None, None, None]:
+    def label_positions(self, positions: typing.List["Position"],
+                        labels: typing.List[str]) -> typing.Generator[None, None, None]:
         raw_with_labels = self._do_label_positions(positions, labels)
         if MODE == Mode.XCOPY:
             self._exit_copy_mode()
@@ -254,9 +257,7 @@ class Screen:
             if MODE == Mode.XCOPY and self._copy_mode is not None:
                 self._enter_copy_mode(True)
 
-    def _do_label_positions(
-        self, positions: typing.List["Position"], labels: typing.List[str]
-    ) -> str:
+    def _do_label_positions(self, positions: typing.List["Position"], labels: typing.List[str]) -> str:
         temp: typing.List[str] = []
         for line in self._lines:
             temp.append(line.chars)
@@ -269,7 +270,7 @@ class Screen:
             if label == "":
                 continue
             if offset < position.offset:
-                segment = TEXT_ATTRS + raw[offset : position.offset]
+                segment = TEXT_ATTRS + raw[offset:position.offset]
                 segments.append(segment)
             segment = LABEL_ATTRS + label
             segments.append(segment)
@@ -299,6 +300,54 @@ class Screen:
             f.write("\033[?1049l")
         self._alternate_on = False
 
+    def amend_command(self, tmux_command: typing.List[str], action: str):
+        tmux_command += (
+            'send-keys',
+            "-t",
+            self._id,
+            "-X",
+            action,
+            ";",
+        )
+
+    def ensure_auto_begin(self, tmux_command: typing.List[str]):
+        if not AUTO_BEGIN_SELECTION:
+            self.amend_command(tmux_command, 'begin-selection')
+
+    def copy_word(self, tmux_command: typing.List[str]):
+        self.ensure_auto_begin(tmux_command)
+
+        self.amend_command(tmux_command, 'next-word-end')
+        self.amend_command(tmux_command, 'copy-selection-and-cancel')
+
+    def copy_until_space(self, tmux_command: typing.List[str]):
+        self.ensure_auto_begin(tmux_command)
+
+        self.amend_command(tmux_command, 'next-space-end')
+        self.amend_command(tmux_command, 'copy-selection-and-cancel')
+
+    def copy_line(self, tmux_command: typing.List[str]):
+        self.ensure_auto_begin(tmux_command)
+
+        self.amend_command(tmux_command, 'end-of-line')
+        # Don't get new line
+        self.amend_command(tmux_command, 'cursor-left')
+        self.amend_command(tmux_command, 'copy-selection-and-cancel')
+
+    def paste_after(self, tmux_command: typing.List[str]):
+        tmux_command += ('paste-buffer', ';')
+
+    def maybe_amend_command(self, tmux_command: typing.List[str]):
+        if COPY_WORD:
+            self.copy_word(tmux_command)
+        elif COPY_UNTIL_SPACE:
+            self.copy_until_space(tmux_command)
+        elif COPY_LINE:
+            self.copy_line(tmux_command)
+
+        if PASTE_AFTER:
+            self.paste_after(tmux_command)
+
     def jump_to_pos(self, x: int, y: int) -> None:
         if MODE == MODE.XCOPY:
             ok = self._enter_copy_mode(False)
@@ -313,9 +362,7 @@ class Screen:
                     x += 1
             tmux_command = []
             self._xcopy_jump_to_pos(x, y, tmux_command)
-            if (
-                self._copy_mode is None or self._copy_mode.selection is None
-            ) and AUTO_BEGIN_SELECTION:
+            if (self._copy_mode is None or self._copy_mode.selection is None) and AUTO_BEGIN_SELECTION:
                 tmux_command += (
                     "send-keys",
                     "-t",
@@ -324,15 +371,14 @@ class Screen:
                     "begin-selection",
                     ";",
                 )
+            self.maybe_amend_command(tmux_command)
             _run_tmux_command(*tmux_command)
         elif MODE == MODE.MOUSE:
             self._mouse_jump_to_pos(x, y)
         else:
             assert False
 
-    def _xcopy_jump_to_pos(
-        self, x: int, y: int, tmux_command: typing.List[str]
-    ) -> None:
+    def _xcopy_jump_to_pos(self, x: int, y: int, tmux_command: typing.List[str]) -> None:
         cursor_x, cursor_y = self._cursor_pos[-1]
         if (x, y) == (cursor_x, cursor_y):
             return
@@ -372,7 +418,7 @@ class Screen:
             self._id,
             "-H",
         ]
-        args.extend(keys_in_hex[i : i + 2] for i in range(0, len(keys_in_hex), 2))
+        args.extend(keys_in_hex[i:i + 2] for i in range(0, len(keys_in_hex), 2))
         if PRINT_COMMAND_ONLY:
             sys.stdout.write(shlex.join(("tmux", *args)))
         else:
@@ -436,19 +482,13 @@ class Screen:
                     else:
                         tmux_command += ("begin-selection", ";")
             if restore_copy_cursor:
-                self._xcopy_jump_to_pos(
-                    self._copy_mode.cursor_x, self._copy_mode.cursor_y, tmux_command
-                )
+                self._xcopy_jump_to_pos(self._copy_mode.cursor_x, self._copy_mode.cursor_y, tmux_command)
             _run_tmux_command(*tmux_command)
         self._in_copy_mode = True
         return True
 
     def _get_history_size(self) -> int:
-        history_size = int(
-            _run_tmux_command(
-                "display-message", "-t", self._id, "-p", "#{history_size}"
-            )
-        )
+        history_size = int(_run_tmux_command("display-message", "-t", self._id, "-p", "#{history_size}"))
         return history_size
 
     def _selection_is_linewise(
@@ -478,11 +518,7 @@ def get_key() -> str:
     key_length = 2
     if len(KEY) == key_length:
         return KEY
-    message_template = (
-        "search for key ({key_length} chars): {{:_<{key_length}}}".format(
-            key_length=key_length
-        )
-    )
+    message_template = ("search for key ({key_length} chars): {{:_<{key_length}}}".format(key_length=key_length))
     chars = ""
     for _ in range(key_length):
         message = message_template.format(chars)
@@ -538,9 +574,7 @@ def _do_get_char(message: str, temp_file_name: str) -> str:
         "-1",
         "-p",
         message,
-        'run-shell -b "tee >> {} << EOF\\n%%%\\nEOF"'.format(
-            shlex.quote(temp_file_name)
-        ),
+        'run-shell -b "tee >> {} << EOF\\n%%%\\nEOF"'.format(shlex.quote(temp_file_name)),
     )
 
     def handler(signum, frame) -> None:
@@ -570,7 +604,7 @@ def search_for_key(lines: typing.List[Line], key: str) -> typing.List[Position]:
             char_index = lower_line_chars.find(lower_key, char_index + len(key))
             if char_index < 0:
                 break
-            potential_key = line.chars[char_index : char_index + len(key)]
+            potential_key = line.chars[char_index:char_index + len(key)]
             if not _test_potential_key(potential_key, key):
                 continue
             column_index = _calculate_display_width(line.chars[:char_index])
@@ -621,7 +655,7 @@ def _point_is_in_region(x: int, y: int) -> bool:
     if n == 0:
         return True
     for i in range(0, n, 4):
-        region = REGIONS[i : i + 4]
+        region = REGIONS[i:i + 4]
         if x >= region[0] and y >= region[1] and x <= region[2] and y <= region[3]:
             return True
     return False
@@ -635,7 +669,7 @@ def generate_labels(key_length: int, number_of_positions: int) -> typing.List[st
         if x == key_length:
             y = 0
             break
-        m = n ** x
+        m = n**x
         for i in range(m):
             if m - i + i * n >= number_of_positions:
                 y = i
@@ -666,7 +700,7 @@ def assign_labels(
     def distance_to_cursor(position: Position) -> float:
         a = position.column_number - (cursor_pos[0] + 1)
         b = 2 * (position.line_number - (cursor_pos[1] + 1))
-        c = (a * a + b * b) ** 0.5
+        c = (a * a + b * b)**0.5
         return c
 
     rank_2_position_idx = list(range(len(positions)))
@@ -680,9 +714,7 @@ def assign_labels(
     return assigned_labels
 
 
-def find_label(
-    label: str, labels: typing.List[str], positions: typing.List[Position]
-) -> typing.Optional[Position]:
+def find_label(label: str, labels: typing.List[str], positions: typing.List[Position]) -> typing.Optional[Position]:
     for i, label2 in enumerate(labels):
         if label == label2:
             position = positions[i]
@@ -697,9 +729,7 @@ def _run_tmux_command(*args: str) -> str:
 
 
 def _get_tmux_vars(*tmux_var_names: str) -> typing.Dict[str, str]:
-    result = _run_tmux_command(
-        "display-message", "-p", "\n".join("#{%s}" % s for s in tmux_var_names)
-    )
+    result = _run_tmux_command("display-message", "-p", "\n".join("#{%s}" % s for s in tmux_var_names))
     tmux_var_values = result.split("\n")
     tmux_vars = dict(zip(tmux_var_names, tmux_var_values))
     return tmux_vars
