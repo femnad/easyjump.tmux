@@ -653,7 +653,9 @@ def _calculate_char_index(line: str, x: int) -> int:
     for i, c in enumerate(line):
         if display_width >= x:
             return i
-        if unicodedata.east_asian_width(c) == "W":
+        if c == "\t":
+            display_width += 8 - (display_width % 8)
+        elif unicodedata.east_asian_width(c) == "W":
             display_width += 2
         else:
             display_width += 1
@@ -663,7 +665,9 @@ def _calculate_char_index(line: str, x: int) -> int:
 def _calculate_display_width(s: str) -> int:
     display_width = 0
     for c in s:
-        if unicodedata.east_asian_width(c) in ("W", "F"):
+        if c == "\t":
+            display_width += 8 - (display_width % 8)
+        elif unicodedata.east_asian_width(c) in ("W", "F"):
             display_width += 2
         else:
             display_width += 1
